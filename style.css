@@ -144,6 +144,7 @@ img, .img-placeholder, [class*="-img"] {
     letter-spacing: 0.1em;
     padding: 10px 0;
     border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    text-decoration: none;
 }
 
 .utility-container {
@@ -214,6 +215,7 @@ img, .img-placeholder, [class*="-img"] {
    Header Navigation
    ========================================================================== */
 .site-header {
+    text-decoration: none;
     background-color: rgba(255, 255, 255, 0.85);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
@@ -346,6 +348,7 @@ img, .img-placeholder, [class*="-img"] {
    Cinematic Hero Section (Priority 2 & 3)
    ========================================================================== */
 .hero {
+    text-decoration: none;
     position: relative;
     overflow: hidden;
     height: 100vh;
@@ -1604,6 +1607,7 @@ img, .img-placeholder, [class*="-img"] {
    Footer Component Configuration
    ========================================================================== */
 .site-footer {
+    text-decoration: none;
     background-color: var(--bg-dark-indigo);
     color: var(--text-muted);
     padding: 120px 0 40px 0;
