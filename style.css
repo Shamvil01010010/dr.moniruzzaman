@@ -44,9 +44,7 @@
 /* ==========================================================================
    Image Asset Allocations (Synchronized Local and Fallback Gradients)
    ========================================================================== */
-.hero-video {
-    background-color: var(--bg-dark-indigo);
-}
+
 .portrait-img {
     background-image: url('images/doctor.jpg');
 }
