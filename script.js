@@ -3,6 +3,38 @@ document.documentElement.classList.add('js-enabled');
 document.addEventListener('DOMContentLoaded', () => {
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+    // ==========================================================================
+    // 0. Smooth Scroll Engine (Lenis) Integration (Desktop Only)
+    // ==========================================================================
+    let lenis;
+    const isDesktop = window.innerWidth >= 992; // Only activates on desktop viewports
+
+    if (!reducedMotion && isDesktop && typeof window.Lenis !== "undefined") {
+        lenis = new window.Lenis({
+            lerp: 0.01,                 // Change from 0.01 back to 0.08 for a perfect, gentle drift
+            wheelMultiplier: 1.0,       
+            smoothTouch: false,         
+            infinite: false,
+        });
+
+        // Bind Lenis scroll events to update GSAP's ScrollTrigger safely
+        if (typeof window.gsap !== "undefined" && typeof window.ScrollTrigger !== "undefined") {
+            lenis.on('scroll', window.ScrollTrigger.update);
+
+            window.gsap.ticker.add((time) => {
+                lenis.raf(time * 1000);
+            });
+
+            window.gsap.ticker.lagSmoothing(0);
+        } else {
+            const raf = (time) => {
+                lenis.raf(time);
+                requestAnimationFrame(raf);
+            };
+            requestAnimationFrame(raf);
+        }
+    }
+
     // Play the large hero asset only while it contributes to the page.
     const heroVideo = document.querySelector('.hero-video');
     if (heroVideo) {
@@ -11,7 +43,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             const heroVideoObserver = new IntersectionObserver(([entry]) => {
                 if (entry.isIntersecting) {
-                    heroVideo.play().catch(() => {});
+                    heroVideo.play().catch(() => { });
                 } else {
                     heroVideo.pause();
                 }
@@ -35,8 +67,10 @@ document.addEventListener('DOMContentLoaded', () => {
             particleLayer.appendChild(particle);
         });
     }
-    
+
+    // ==========================================================================
     // 1. Dynamic Header Navigation scrolling transitions
+    // ==========================================================================
     const header = document.querySelector('.site-header');
     let lastScrollY = window.scrollY;
 
@@ -60,9 +94,17 @@ document.addEventListener('DOMContentLoaded', () => {
         lastScrollY = Math.max(0, currentScrollY);
     };
 
+    // Run header updates on native scroll events
     window.addEventListener('scroll', updateHeaderClasses, { passive: true });
 
+    // Also link header updates directly to Lenis scroll calculations so it never pauses during smooth scroll
+    if (lenis) {
+        lenis.on('scroll', updateHeaderClasses);
+    }
+
+    // ==========================================================================
     // 2. Mobile Nav Toggle Handling
+    // ==========================================================================
     const menuToggle = document.querySelector('.mobile-menu-toggle');
     const siteHeader = document.querySelector('.site-header');
     const mainNav = document.getElementById('mainNav');
@@ -110,7 +152,9 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
+    // ==========================================================================
     // 3. Cinematic Frame Parallax Engine
+    // ==========================================================================
     const parallaxTargets = document.querySelectorAll(".parallax-target");
     let parallaxFrameId = null;
 
@@ -127,10 +171,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (reducedMotion) return;
         const scrollPos = window.scrollY;
         const viewportHeight = window.innerHeight;
-        
+
         parallaxTargets.forEach(target => {
             const rect = target.getBoundingClientRect();
-            // Prevent execution on elements out of viewport coordinates
             if (rect.bottom > 0 && rect.top < viewportHeight) {
                 const speed = parseFloat(target.getAttribute('data-speed')) || 0.1;
                 const absoluteOffset = getAbsoluteOffsetTop(target);
@@ -147,17 +190,18 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }, { passive: true });
 
+    // ==========================================================================
     // 4. Dynamic Counter (Odometer effect)
+    // ==========================================================================
     const runOdometerAnimation = (element) => {
         const target = parseFloat(element.getAttribute('data-target'));
         const decimals = parseInt(element.getAttribute('data-decimal')) || 0;
-        const duration = 2000; // Total count duration in ms
+        const duration = 2000;
         const startTime = performance.now();
 
         const updateCount = (currentTime) => {
             const elapsed = currentTime - startTime;
             const progress = Math.min(elapsed / duration, 1);
-            // Ease out function
             const easeProgress = 1 - Math.pow(1 - progress, 4);
             const currentVal = easeProgress * target;
 
@@ -173,7 +217,9 @@ document.addEventListener('DOMContentLoaded', () => {
         requestAnimationFrame(updateCount);
     };
 
+    // ==========================================================================
     // 5. Bidirectional Scroll Reveal Observer
+    // ==========================================================================
     const revealElements = document.querySelectorAll('.reveal');
 
     const revealObserver = new IntersectionObserver((entries) => {
@@ -181,8 +227,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const element = entry.target;
             if (entry.isIntersecting) {
                 element.classList.add('active');
-                
-                // Trigger counts if target contains odometer class
+
                 const odometers = element.querySelectorAll('.odometer');
                 odometers.forEach(odometer => {
                     if (!odometer.classList.contains('counted')) {
@@ -191,12 +236,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 });
             } else {
-                // Remove class on exit to trigger replay animations (Up & Down scroll loop)
                 element.classList.remove('active');
                 const odometers = element.querySelectorAll('.odometer');
                 odometers.forEach(odometer => {
                     odometer.classList.remove('counted');
-                    // Reset to 0 baseline on exit so next scroll-in animations play cleanly
                     odometer.textContent = "0";
                 });
             }
@@ -210,19 +253,20 @@ document.addEventListener('DOMContentLoaded', () => {
         revealObserver.observe(element);
     });
 
-    // 6. Dynamic Responsive Desktop Scroll-Driven & Mobile Draggable Before/After Slider
+    // ==========================================================================
+    // 6. Dynamic Responsive Desktop Scroll-Driven & Mobile Slider
+    // ==========================================================================
     const initBeforeAfterComparison = () => {
         const section = document.getElementById('smile-transformation');
         const comparisonSlider = document.getElementById('comparisonSlider');
         const afterImgWrapper = document.getElementById('afterImgWrapper');
         const sliderHandle = document.getElementById('sliderHandle');
         const comparisonRange = document.getElementById('comparisonRange');
-        
+
         if (!section || !comparisonSlider || !afterImgWrapper || !sliderHandle) return;
 
         let dragActive = false;
 
-        // Unified Left-to-Right reveal function
         const updatePosition = (percentage) => {
             const clipPercentage = 100 - percentage;
             afterImgWrapper.style.clipPath = `inset(0 ${clipPercentage}% 0 0)`;
@@ -237,14 +281,14 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         const onPointerDown = (e) => {
-            if (window.innerWidth >= 992) return; 
+            if (window.innerWidth >= 992) return;
             dragActive = true;
             comparisonSlider.setPointerCapture(e.pointerId);
             updatePosition(calculatePercent(e.clientX));
         };
 
         const onPointerMove = (e) => {
-            if (window.innerWidth >= 992 || !dragActive) return; 
+            if (window.innerWidth >= 992 || !dragActive) return;
             requestAnimationFrame(() => {
                 updatePosition(calculatePercent(e.clientX));
             });
@@ -263,57 +307,53 @@ document.addEventListener('DOMContentLoaded', () => {
             comparisonRange.addEventListener('input', () => updatePosition(Number(comparisonRange.value)));
         }
 
-        // Precise Scroll Locking/Reveal transition handling
-        const handleScrollTransition = () => {
-            if (window.innerWidth < 992 || reducedMotion) return; 
+        if (typeof gsap !== "undefined" && typeof ScrollTrigger !== "undefined") {
+            gsap.registerPlugin(ScrollTrigger);
+            let mm = gsap.matchMedia();
 
-            const rect = section.getBoundingClientRect();
-            const sectionHeight = rect.height;
-            const viewHeight = window.innerHeight;
-            
-            const scrollOffset = -rect.top;
-            const scrollMaxRange = sectionHeight - viewHeight;
-            
-            if (scrollOffset >= 0 && scrollOffset <= scrollMaxRange) {
-                const progress = (scrollOffset / scrollMaxRange) * 100;
-                
-                requestAnimationFrame(() => {
-                    updatePosition(progress);
-                    section.classList.add('active-scroll');
-                });
-            } else if (scrollOffset < 0) {
-                requestAnimationFrame(() => {
-                    updatePosition(0);
-                    section.classList.remove('active-scroll');
-                });
-            } else if (scrollOffset > scrollMaxRange) {
-                requestAnimationFrame(() => {
-                    updatePosition(100);
-                    section.classList.remove('active-scroll');
-                });
-            }
-        };
-
-        window.addEventListener('scroll', handleScrollTransition, { passive: true });
-
-        const handleLayoutState = () => {
-            if (window.innerWidth < 992 || reducedMotion) {
-                comparisonSlider.style.cursor = 'ew-resize';
-                updatePosition(50); 
-                section.classList.remove('active-scroll');
-            } else {
+            mm.add("(min-width: 992px)", () => {
+                updatePosition(0);
                 comparisonSlider.style.cursor = 'default';
-                handleScrollTransition();
-            }
-        };
 
-        window.addEventListener('resize', handleLayoutState);
-        handleLayoutState();
+                gsap.to({}, {
+                    scrollTrigger: {
+                        trigger: "#smile-transformation",
+                        start: "top top",
+                        end: "+=150%",
+                        pin: true,
+                        scrub: 0.5,
+                        invalidateOnRefresh: true,
+                        onUpdate: (self) => {
+                            const progressPercent = self.progress * 100;
+                            updatePosition(progressPercent);
+
+                            if (self.progress > 0.02 && self.progress < 0.98) {
+                                section.classList.add('active-scroll');
+                            } else {
+                                section.classList.remove('active-scroll');
+                            }
+                        }
+                    }
+                });
+
+                return () => {
+                    section.classList.remove('active-scroll');
+                };
+            });
+
+            mm.add("(max-width: 991px)", () => {
+                comparisonSlider.style.cursor = 'ew-resize';
+                updatePosition(50);
+                section.classList.remove('active-scroll');
+            });
+        }
     };
 
     initBeforeAfterComparison();
 
+    // ==========================================================================
     // 7. Micro-Interactive Cards (3D Tilt Mouse tracking)
+    // ==========================================================================
     const tiltCards = document.querySelectorAll('.interactive-hover-card');
 
     tiltCards.forEach(card => {
@@ -321,14 +361,13 @@ document.addEventListener('DOMContentLoaded', () => {
             const rect = card.getBoundingClientRect();
             const x = e.clientX - rect.left;
             const y = e.clientY - rect.top;
-            
+
             const midX = rect.width / 2;
             const midY = rect.height / 2;
-            
-            const rotX = ((y - midY) / midY) * 5; // degrees tilt limits
+
+            const rotX = ((y - midY) / midY) * 5;
             const rotY = ((midX - x) / midX) * 5;
-            
-            // Bypass CSS delay curves momentarily during live cursor tracking
+
             card.style.transition = 'none';
             card.style.transform = `perspective(1000px) rotateX(${rotX}deg) rotateY(${rotY}deg) scale(1.025)`;
         });
@@ -339,7 +378,9 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
+    // ==========================================================================
     // 8. FAQ Accordion Handler
+    // ==========================================================================
     const faqTriggers = document.querySelectorAll('.faq-trigger');
 
     faqTriggers.forEach(trigger => {
@@ -368,7 +409,9 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
+    // ==========================================================================
     // 9. Active Navigation Underline Scroll Mapping
+    // ==========================================================================
     const sections = document.querySelectorAll('section[id]');
     const navLinks = document.querySelectorAll('.nav-left .nav-link, .nav-right .nav-link');
 
@@ -394,7 +437,9 @@ document.addEventListener('DOMContentLoaded', () => {
         activeNavigationObserver.observe(section);
     });
 
-    // 10. Back To Top Dynamics
+    // ==========================================================================
+    // 10. Back To Top Dynamics & Smooth Anchor Clicks
+    // ==========================================================================
     const backToTopBtn = document.getElementById('backToTop');
 
     if (backToTopBtn) {
@@ -408,14 +453,38 @@ document.addEventListener('DOMContentLoaded', () => {
 
         backToTopBtn.addEventListener('click', (e) => {
             e.preventDefault();
-            window.scrollTo({
-                top: 0,
-                behavior: 'smooth'
-            });
+            if (lenis) {
+                lenis.scrollTo(0, { duration: 1.2 });
+            } else {
+                window.scrollTo({
+                    top: 0,
+                    behavior: 'smooth'
+                });
+            }
         });
     }
 
-    // No server is configured yet: compose a real request in the visitor's email app.
+    // Intercept standard anchor link clicks to run through Lenis as well (so navbar stays synchronized)
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener('click', function (e) {
+            const targetId = this.getAttribute('href');
+            if (targetId === '#') return;
+            
+            const targetElement = document.querySelector(targetId);
+            if (targetElement) {
+                e.preventDefault();
+                if (lenis) {
+                    lenis.scrollTo(targetElement, { duration: 1.2, offset: -80 }); // Adjust offset for fixed navbar
+                } else {
+                    targetElement.scrollIntoView({ behavior: 'smooth' });
+                }
+            }
+        });
+    });
+
+    // ==========================================================================
+    // 11. Appointment Form Submission
+    // ==========================================================================
     const appointmentForm = document.getElementById('appointmentForm');
     const appointmentStatus = document.getElementById('appointmentStatus');
     if (appointmentForm && appointmentStatus) {
